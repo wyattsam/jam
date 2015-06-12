@@ -8,10 +8,11 @@ import getpass
 # used for logging purposes
 app = Flask(__name__)
 
+
 class JiraConnector(object):
     def __init__(self):
         self._url = settings.jira_url
-        self._jsonheader = {'Content-Type':'application/json'}
+        self._jsonheader = {'Content-Type': 'application/json'}
         self._session = requests.Session()
         self._allgroup = 'jira-users'
         self._searchrange = 5000
@@ -30,9 +31,9 @@ class JiraConnector(object):
     def login(self, usr, pwd):
         url = self._url + self._ext['session']
         payload = {
-            'username':usr,
-            'password':pwd
-                   }
+            'username': usr,
+            'password': pwd
+        }
         self._session.auth = (usr, pwd)
         response = self._session.post(
             url,
@@ -65,19 +66,19 @@ class JiraConnector(object):
 
     def get_user(self, username):
         url = self._url + self._ext['user']
-        response = self._session.get(url,params={'username': username})
+        response = self._session.get(url, params={'username': username})
         return response.status_code == 200, response.text
 
     def update_user(self, name, email, username):
         url = self._url + self._ext['user']
         payload = {
-            'name':name,
-            'emailAddress':email,
+            'name': name,
+            'emailAddress': email,
             'displayName': disp
         }
         response = self._session.put(
             url,
-            params={'username':username},
+            params={'username': username},
             data=json.dumps(payload),
             headers=self._jsonheader
         )
@@ -85,7 +86,7 @@ class JiraConnector(object):
 
     def delete_user(self, usrname):
         url = self._url + self._ext['user']
-        response = self._session.delete(url,params={'username':usrname})
+        response = self._session.delete(url, params={'username': usrname})
         return response.status_code == 204, response.text
 
     def search_user(self, query, exclude, page, limit):
@@ -94,12 +95,12 @@ class JiraConnector(object):
         query_params = {
             'username': query,
             'exclude': exclude,
-            'startAt': (page-1)*limit,
+            'startAt': (page - 1) * limit,
             'maxResults': limit
             # 'includeActive':false,
             # 'includeInactive':false
         }
-        response = self._session.get(url,params=query_params)
+        response = self._session.get(url, params=query_params)
         return response.status_code == 200, response.text
 
     def all_users(self, page, limit):
@@ -107,30 +108,30 @@ class JiraConnector(object):
         start = (page - 1) * limit
         end = page * limit - 1
         query_params = {
-            'groupname':self._allgroup,
+            'groupname': self._allgroup,
             'expand': ('users[%d:%d]' % (start, end))
         }
-        response = self._session.get(url,params=query_params)
+        response = self._session.get(url, params=query_params)
         return response.status_code == 200, response.text
 
     # group CRUD operations
 
-    def create_group(self,grpname):
+    def create_group(self, grpname):
         url = self._url + self._ext['group']
-        response = self._session.post(url,data=json.dumps({'name':grpname}),headers=self._jsonheader)
+        response = self._session.post(url, data=json.dumps({'name': grpname}), headers=self._jsonheader)
         return response.status_code == 201, response.text
 
-    def get_group(self,grpname):
+    def get_group(self, grpname):
         url = self._url + self._ext['group']
-        response = self._session.get(url,params={'groupname':grpname})
+        response = self._session.get(url, params={'groupname': grpname})
         return response.status_code == 200, response.text
 
-    def add_user_group(self,username,grpname):
+    def add_user_group(self, username, grpname):
         url = self._url + self._ext['user_group']
         response = self._session.post(
             url,
-            data=json.dumps({'name':username}),
-            params={'groupname':grpname},
+            data=json.dumps({'name': username}),
+            params={'groupname': grpname},
             headers=self._jsonheader,
         )
         return response.status_code == 201, response.text
@@ -139,23 +140,27 @@ class JiraConnector(object):
         url = self._url + self._ext['user_group']
         response = self._session.delete(
             url,
-            params={'groupname':grpname, 'username':username},
+            params={'groupname': grpname, 'username': username},
             headers=self._jsonheader,
         )
         return response.status_code == 200, response.text
 
-    def delete_group(self,grpname):
+    def delete_group(self, grpname):
         url = self._url + self._ext['group']
-        response = self._session.delete(url,params={'groupname':grpname})
+        response = self._session.delete(url, params={'groupname': grpname})
         return response.status_code == 200, response.text
 
+    #assuming that you're not going to page through over 5000 items
     def search_group(self, query, exclude, page, limit):
-        return self.page_group(query,exclude,page,limit)
+        return self.page_group(query, exclude, page, limit)
 
-    def page_group(self,query,exclude,page,limit):
+    def page_group(self, query, exclude, page, limit):
         # temporarily store in an array of set size maybe like 5000?
         key = "g_%s" % query.lower()
         if key not in self._session.params:
+            # clear the previous key so that you don't eventually run out of room
+            self._session.params.clear()
+
             print ("COULD NOT FIND KEY, CREATE NEW KEY")
             page_store = []
             url = self._url + self._ext['group_picker']
@@ -164,12 +169,12 @@ class JiraConnector(object):
                 'exclude': exclude,
                 'maxResults': self._searchrange
             }
-            response = self._session.get(url,params=query_params)
+            response = self._session.get(url, params=query_params)
             if response.status_code != 200:
                 return None
             response = json.loads(response.text)
             for group in response['groups']:
-                page_store.append((group['name'],group['html']))
+                page_store.append((group['name'], group['html']))
             self._session.params[key] = page_store
 
         start = (page - 1) * limit
@@ -177,13 +182,32 @@ class JiraConnector(object):
         print ("LOAD KEY")
         return self._session.params[key][start:end]
 
+    def page_user(self, query, exclude, page, limit):
+        # temporarily store in an array of set size maybe like 5000?
+        key = "u_%s" % query.lower()
+        if key not in self._session.params:
+            page_store = []
+            url = self._url + self._ext['user_picker']
+            query_params = {
+                'query': query,
+                'exclude': exclude,
+                'maxResults': self._searchrange
+            }
+            response = self._session.get(url, params=query_params)
+            if response.status_code != 200:
+                return None
+            response = json.loads(response.text)
+            for user in response['users']:
+                page_store.append((user['name'], user['html'], user['displayName'], user['avatarUrl']))
+            self._session.params[key] = page_store
 
-
+        start = (page - 1) * limit
+        end = (page * limit) - 1
+        return self._session.params[key][start:end]
 
 
 
 # THIS BELOW PORTION IS FOR TESTING PURPOSES ONLY
-
 jira = JiraConnector()
 
 while 1:
@@ -197,15 +221,15 @@ while 1:
         pwd = str(getpass.getpass('password '))
         print jira.login(usr, pwd)
     elif sel == 2:
-        print jira.logout() # what parameters will I have to pass in later?
+        print jira.logout()  # what parameters will I have to pass in later?
     elif sel == 3:
-        name,email,disp,pwd = str(input("username email displayname password ")).split()
+        name, email, disp, pwd = str(input("username email displayname password ")).split()
         print jira.create_user(name, email, disp, pwd)
     elif sel == 4:
         username = str(input("username"))
         print jira.get_user(username)
     elif sel == 5:
-        name,email,disp,pwd = str(input("username email displayname password ")).split()
+        name, email, disp, pwd = str(input("username email displayname password ")).split()
         print jira.update_user(name, email, disp, username)
     elif sel == 6:
         username = str(input("username "))
@@ -217,11 +241,11 @@ while 1:
         grpname = str(input("groupname "))
         print jira.get_group(grpname)
     elif sel == 9:
-        username,grpname = str(input("username groupname ")).split()
-        print jira.add_user_group(username,grpname)
+        username, grpname = str(input("username groupname ")).split()
+        print jira.add_user_group(username, grpname)
     elif sel == 10:
-        username,grpname = str(input("username groupname ")).split()
-        print jira.delete_user_group(username,grpname)
+        username, grpname = str(input("username groupname ")).split()
+        print jira.delete_user_group(username, grpname)
     elif sel == 11:
         grpname = str(input("groupname "))
         print jira.delete_group(grpname)
@@ -232,7 +256,7 @@ while 1:
         limit = int(input('what limit: '))
         print jira.search_user(query, exclude, page, limit)
     elif sel == 13:
-        print jira.all_users(1,50)
+        print jira.all_users(1, 50)
     elif sel == 14:
         query = str(input("what to search for: "))
         exclude = str(input("What to exclude: "))
