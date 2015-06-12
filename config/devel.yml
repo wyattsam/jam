@@ -1,0 +1,9 @@
+db:
+    host: localhost
+    db_name: mongodb_www
+xgen_db:
+    host: localhost
+    db_name: www
+dochub_db:
+    host: localhost
+    db_name: dochub
