@@ -14,6 +14,7 @@ class JiraConnector(object):
         self._jsonheader = {'Content-Type':'application/json'}
         self._session = requests.Session()
         self._allgroup = 'jira-users'
+        self._searchrange = 5000
 
         # url extensions
         self._ext = dict(
@@ -40,7 +41,7 @@ class JiraConnector(object):
         )
         return response.status_code == 200, response.text
 
-    def logout(self): # what parameters will I have to pass in later?
+    def logout(self):  # what parameters will I have to pass in later?
         url = self._url + self._ext['session']
         response = self._session.delete(url)
         return response.status_code == 204, response.text
@@ -112,7 +113,6 @@ class JiraConnector(object):
         response = self._session.get(url,params=query_params)
         return response.status_code == 200, response.text
 
-
     # group CRUD operations
 
     def create_group(self,grpname):
@@ -149,18 +149,40 @@ class JiraConnector(object):
         response = self._session.delete(url,params={'groupname':grpname})
         return response.status_code == 200, response.text
 
-
-    #TODO: CANNOT PAGE
     def search_group(self, query, exclude, page, limit):
-        url = self._url + self._ext['group_picker']
-        query_params = {
-            'query': query,
-            'startAt': (page-1)*limit,
-            'maxResults': limit
-        }
-        response = self._session.get(url,params=query_params)
-        return response.status_code == 200, response.text
+        return self.page_group(query,exclude,page,limit)
 
+    def page_group(self,query,exclude,page,limit):
+        # temporarily store in an array of set size maybe like 5000?
+        key = "g_%s" % query.lower()
+        if key not in self._session.params:
+            print ("COULD NOT FIND KEY, CREATE NEW KEY")
+            page_store = []
+            url = self._url + self._ext['group_picker']
+            query_params = {
+                'query': query,
+                'exclude': exclude,
+                'maxResults': self._searchrange
+            }
+            response = self._session.get(url,params=query_params)
+            if response.status_code != 200:
+                return None
+            response = json.loads(response.text)
+            for group in response['groups']:
+                page_store.append((group['name'],group['html']))
+            self._session.params[key] = page_store
+
+        start = (page - 1) * limit
+        end = (page * limit) - 1
+        print ("LOAD KEY")
+        return self._session.params[key][start:end]
+
+
+
+
+
+
+# THIS BELOW PORTION IS FOR TESTING PURPOSES ONLY
 
 jira = JiraConnector()
 
